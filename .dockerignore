@@ -1,0 +1,10 @@
+.git
+.gitignore
+gateway.db
+*.db
+*.sqlite
+/server
+/ai-gateway
+tmp
+Dockerfile
+docker-compose.yml

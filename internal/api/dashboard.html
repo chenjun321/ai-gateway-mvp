@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Gateway Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --panel-soft: #f2f5f8;
+      --text: #1d2430;
+      --muted: #657284;
+      --line: #d9e0e8;
+      --blue: #2563eb;
+      --blue-strong: #1d4ed8;
+      --green: #0f8b63;
+      --red: #c2413a;
+      --amber: #a16207;
+      --shadow: 0 10px 24px rgba(18, 29, 43, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 24px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+      gap: 18px;
+      padding: 18px;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    section, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    section {
+      padding: 16px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .row.wrap {
+      flex-wrap: wrap;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--text);
+      padding: 9px 10px;
+      font: inherit;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 86px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    button {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--text);
+      padding: 9px 12px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      min-height: 38px;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      border-color: #aab6c5;
+      background: #f8fafc;
+    }
+
+    button.primary {
+      background: var(--blue);
+      color: #ffffff;
+      border-color: var(--blue);
+    }
+
+    button.primary:hover {
+      background: var(--blue-strong);
+      border-color: var(--blue-strong);
+    }
+
+    button.danger {
+      color: var(--red);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status.ok {
+      color: var(--green);
+    }
+
+    .status.err {
+      color: var(--red);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .pill.enabled {
+      color: var(--green);
+      background: #e9f7f1;
+      border-color: #bde6d3;
+    }
+
+    .pill.disabled {
+      color: var(--red);
+      background: #fff0ef;
+      border-color: #f1c2bf;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 760px;
+      background: #ffffff;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    pre {
+      margin: 0;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 280px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #101827;
+      color: #e8eef8;
+      line-height: 1.45;
+    }
+
+    .key-box {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px dashed #9db0c7;
+      border-radius: 8px;
+      background: #f8fbff;
+    }
+
+    .key-value {
+      overflow-wrap: anywhere;
+      color: var(--blue-strong);
+      font-weight: 800;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .metric {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .checkbox-row input {
+      width: 16px;
+      height: 16px;
+    }
+
+    @media (max-width: 980px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 14px;
+      }
+
+      main {
+        padding: 12px;
+      }
+
+      .split, .metric-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .row {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>AI Gateway Dashboard</h1>
+      <div class="muted">Tenant keys, mock chat, and usage</div>
+    </div>
+    <div class="row wrap">
+      <a href="/docs" target="_blank">Swagger UI</a>
+      <a href="/openapi.yaml" target="_blank">OpenAPI YAML</a>
+      <span id="health" class="pill">checking</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="stack">
+      <section>
+        <h2>Tenants</h2>
+        <div class="stack">
+          <div class="split">
+            <label>Name
+              <input id="tenantName" data-testid="tenant-name" value="acme">
+            </label>
+            <label>Scopes
+              <input id="tenantScopes" data-testid="tenant-scopes" value="chat:invoke, model:mock-gpt, model:mock-error, model:mock-timeout">
+            </label>
+          </div>
+          <div class="row">
+            <button id="createTenant" class="primary" data-testid="create-tenant">Create Tenant</button>
+            <button id="refreshTenants" data-testid="refresh-tenants">Refresh</button>
+          </div>
+          <label>Selected tenant
+            <select id="tenantSelect" data-testid="tenant-select"></select>
+          </label>
+          <div id="tenantStatus" class="status"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>API Keys</h2>
+        <div class="stack">
+          <div class="split">
+            <label>Name
+              <input id="keyName" data-testid="key-name" value="dev-service">
+            </label>
+            <label>Expires at
+              <input id="keyExpiresAt" data-testid="key-expires-at" value="2026-12-31T23:59:59Z">
+            </label>
+          </div>
+          <label>Scopes
+            <input id="keyScopes" data-testid="key-scopes" value="chat:invoke, model:mock-gpt">
+          </label>
+          <label class="checkbox-row">
+            <input id="keyEnabled" data-testid="key-enabled" type="checkbox" checked>
+            Enabled
+          </label>
+          <div class="row">
+            <button id="createKey" class="primary" data-testid="create-key">Create Key</button>
+            <button id="refreshKeys" data-testid="refresh-keys">Refresh</button>
+          </div>
+          <div id="keyStatus" class="status"></div>
+          <div id="rawKeyBox" class="key-box" hidden>
+            <h3>New Gateway Key</h3>
+            <div id="rawKey" class="key-value" data-testid="raw-key"></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Key</th>
+                  <th>Scopes</th>
+                  <th>Status</th>
+                  <th>Expires</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="keysTable" data-testid="keys-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="stack">
+      <section>
+        <h2>Chat Test</h2>
+        <div class="stack">
+          <div class="split">
+            <label>Gateway key
+              <input id="chatKey" data-testid="chat-key" placeholder="sk-gw_...">
+            </label>
+            <label>Model
+              <input id="chatModel" data-testid="chat-model" value="mock-gpt">
+            </label>
+          </div>
+          <label>Thread ID
+            <input id="threadId" data-testid="thread-id" value="thread-dashboard-1">
+          </label>
+          <label>User message
+            <textarea id="chatMessage" data-testid="chat-message">hello gateway</textarea>
+          </label>
+          <div class="row">
+            <button id="sendChat" class="primary" data-testid="send-chat">Send Chat</button>
+            <button id="useLastKey" data-testid="use-last-key">Use Last Key</button>
+          </div>
+          <div id="chatStatus" class="status"></div>
+          <pre id="chatResponse" data-testid="chat-response">{}</pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Usage</h2>
+        <div class="stack">
+          <div class="metric-grid">
+            <div class="metric"><strong id="metricRequests">0</strong><span>requests</span></div>
+            <div class="metric"><strong id="metricTokens">0</strong><span>tokens</span></div>
+            <div class="metric"><strong id="metricModels">0</strong><span>models</span></div>
+          </div>
+          <div class="row">
+            <button id="refreshUsage" class="primary" data-testid="refresh-usage">Refresh Usage</button>
+          </div>
+          <div id="usageStatus" class="status"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Tenant</th>
+                  <th>Key</th>
+                  <th>Model</th>
+                  <th>Thread</th>
+                  <th>Prompt</th>
+                  <th>Completion</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="usageTable" data-testid="usage-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const state = {
+      tenants: [],
+      keys: [],
+      lastRawKey: localStorage.getItem("gateway.lastRawKey") || ""
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function setStatus(id, text, kind = "") {
+      const el = $(id);
+      el.textContent = text;
+      el.className = "status" + (kind ? " " + kind : "");
+    }
+
+    function parseScopes(value) {
+      return value
+        .split(/[\n,]/)
+        .map((scope) => scope.trim())
+        .filter(Boolean);
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {})
+        }
+      });
+      const text = await res.text();
+      const body = text ? JSON.parse(text) : null;
+      if (!res.ok) {
+        const message = body?.error?.message || body?.error || res.statusText;
+        const err = new Error(message);
+        err.status = res.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    }
+
+    function selectedTenantID() {
+      return $("tenantSelect").value;
+    }
+
+    function renderTenants() {
+      const select = $("tenantSelect");
+      const previous = select.value;
+      select.innerHTML = "";
+      for (const tenant of state.tenants) {
+        const option = document.createElement("option");
+        option.value = tenant.id;
+        option.textContent = `${tenant.name} (${tenant.id})`;
+        select.appendChild(option);
+      }
+      if (state.tenants.some((tenant) => tenant.id === previous)) {
+        select.value = previous;
+      }
+    }
+
+    function renderKeys() {
+      const tbody = $("keysTable");
+      tbody.innerHTML = "";
+      if (state.keys.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="muted">No keys</td></tr>`;
+        return;
+      }
+      for (const key of state.keys) {
+        const tr = document.createElement("tr");
+        const scopes = key.scopes.join(", ");
+        const statusClass = key.enabled ? "enabled" : "disabled";
+        const statusText = key.enabled ? "enabled" : "disabled";
+        tr.innerHTML = `
+          <td>${escapeHTML(key.name)}</td>
+          <td><code>${escapeHTML(key.key_prefix)}...</code></td>
+          <td>${escapeHTML(scopes)}</td>
+          <td><span class="pill ${statusClass}">${statusText}</span></td>
+          <td>${key.expires_at ? escapeHTML(key.expires_at) : "never"}</td>
+          <td><button data-key-id="${key.id}" data-enabled="${key.enabled}" class="${key.enabled ? "danger" : ""}">${key.enabled ? "Disable" : "Enable"}</button></td>
+        `;
+        tbody.appendChild(tr);
+      }
+      for (const button of tbody.querySelectorAll("button[data-key-id]")) {
+        button.addEventListener("click", async () => {
+          const keyID = button.dataset.keyId;
+          const enabled = button.dataset.enabled !== "true";
+          await updateKeyEnabled(keyID, enabled);
+        });
+      }
+    }
+
+    function renderUsage(records) {
+      const tbody = $("usageTable");
+      tbody.innerHTML = "";
+      if (records.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="muted">No usage records</td></tr>`;
+      }
+      for (const record of records) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${new Date(record.created_at).toLocaleString()}</td>
+          <td><code>${escapeHTML(record.tenant_id)}</code></td>
+          <td>${escapeHTML(record.api_key_name || record.api_key_id)}</td>
+          <td>${escapeHTML(record.model)}</td>
+          <td>${escapeHTML(record.thread_id || "")}</td>
+          <td>${record.prompt_tokens}</td>
+          <td>${record.completion_tokens}</td>
+          <td>${record.total_tokens}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function refreshHealth() {
+      try {
+        await api("/healthz");
+        $("health").textContent = "healthy";
+        $("health").className = "pill enabled";
+      } catch {
+        $("health").textContent = "down";
+        $("health").className = "pill disabled";
+      }
+    }
+
+    async function refreshTenants() {
+      setStatus("tenantStatus", "Loading tenants...");
+      try {
+        const body = await api("/tenants");
+        state.tenants = body.data || [];
+        renderTenants();
+        setStatus("tenantStatus", `${state.tenants.length} tenant(s) loaded`, "ok");
+        await refreshKeys();
+        await refreshUsage();
+      } catch (err) {
+        setStatus("tenantStatus", err.message, "err");
+      }
+    }
+
+    async function createTenant() {
+      setStatus("tenantStatus", "Creating tenant...");
+      try {
+        const tenant = await api("/tenants", {
+          method: "POST",
+          body: JSON.stringify({
+            name: $("tenantName").value.trim(),
+            scopes: parseScopes($("tenantScopes").value)
+          })
+        });
+        setStatus("tenantStatus", `Created ${tenant.id}`, "ok");
+        await refreshTenants();
+        $("tenantSelect").value = tenant.id;
+        await refreshKeys();
+      } catch (err) {
+        setStatus("tenantStatus", err.message, "err");
+      }
+    }
+
+    async function refreshKeys() {
+      const tenantID = selectedTenantID();
+      if (!tenantID) {
+        state.keys = [];
+        renderKeys();
+        return;
+      }
+      setStatus("keyStatus", "Loading keys...");
+      try {
+        const body = await api(`/tenants/${encodeURIComponent(tenantID)}/keys`);
+        state.keys = body.data || [];
+        renderKeys();
+        setStatus("keyStatus", `${state.keys.length} key(s) loaded`, "ok");
+      } catch (err) {
+        setStatus("keyStatus", err.message, "err");
+      }
+    }
+
+    async function createKey() {
+      const tenantID = selectedTenantID();
+      if (!tenantID) {
+        setStatus("keyStatus", "Create or select a tenant first", "err");
+        return;
+      }
+      setStatus("keyStatus", "Creating key...");
+      $("rawKeyBox").hidden = true;
+      try {
+        const expiresAt = $("keyExpiresAt").value.trim();
+        const key = await api(`/tenants/${encodeURIComponent(tenantID)}/keys`, {
+          method: "POST",
+          body: JSON.stringify({
+            name: $("keyName").value.trim(),
+            scopes: parseScopes($("keyScopes").value),
+            enabled: $("keyEnabled").checked,
+            expires_at: expiresAt || null
+          })
+        });
+        state.lastRawKey = key.key;
+        localStorage.setItem("gateway.lastRawKey", key.key);
+        $("chatKey").value = key.key;
+        $("rawKey").textContent = key.key;
+        $("rawKeyBox").hidden = false;
+        setStatus("keyStatus", `Created ${key.id}`, "ok");
+        await refreshKeys();
+      } catch (err) {
+        setStatus("keyStatus", err.message, "err");
+      }
+    }
+
+    async function updateKeyEnabled(keyID, enabled) {
+      const tenantID = selectedTenantID();
+      setStatus("keyStatus", enabled ? "Enabling key..." : "Disabling key...");
+      try {
+        await api(`/tenants/${encodeURIComponent(tenantID)}/keys/${encodeURIComponent(keyID)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ enabled })
+        });
+        setStatus("keyStatus", enabled ? "Key enabled" : "Key disabled", "ok");
+        await refreshKeys();
+      } catch (err) {
+        setStatus("keyStatus", err.message, "err");
+      }
+    }
+
+    async function sendChat() {
+      const gatewayKey = $("chatKey").value.trim();
+      if (!gatewayKey) {
+        setStatus("chatStatus", "Gateway key is required", "err");
+        return;
+      }
+      setStatus("chatStatus", "Sending request...");
+      try {
+        const body = await api("/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${gatewayKey}` },
+          body: JSON.stringify({
+            model: $("chatModel").value.trim(),
+            thread_id: $("threadId").value.trim(),
+            messages: [{ role: "user", content: $("chatMessage").value }]
+          })
+        });
+        $("chatResponse").textContent = JSON.stringify(body, null, 2);
+        setStatus("chatStatus", "Request completed", "ok");
+        await refreshUsage();
+      } catch (err) {
+        $("chatResponse").textContent = JSON.stringify(err.body || { error: err.message }, null, 2);
+        setStatus("chatStatus", `${err.status || ""} ${err.message}`.trim(), "err");
+        await refreshUsage();
+      }
+    }
+
+    async function refreshUsage() {
+      const tenantID = selectedTenantID();
+      const qs = tenantID ? `?tenant_id=${encodeURIComponent(tenantID)}&limit=100` : "?limit=100";
+      setStatus("usageStatus", "Loading usage...");
+      try {
+        const [recordsBody, summaryBody] = await Promise.all([
+          api(`/usage${qs}`),
+          api(`/usage/summary${tenantID ? `?tenant_id=${encodeURIComponent(tenantID)}` : ""}`)
+        ]);
+        const records = recordsBody.data || [];
+        const summary = summaryBody.data || [];
+        renderUsage(records);
+        const requestCount = summary.reduce((sum, item) => sum + item.request_count, 0);
+        const tokenCount = summary.reduce((sum, item) => sum + item.total_tokens, 0);
+        const modelCount = new Set(summary.map((item) => item.model)).size;
+        $("metricRequests").textContent = requestCount;
+        $("metricTokens").textContent = tokenCount;
+        $("metricModels").textContent = modelCount;
+        setStatus("usageStatus", `${records.length} usage record(s) loaded`, "ok");
+      } catch (err) {
+        setStatus("usageStatus", err.message, "err");
+      }
+    }
+
+    function useLastKey() {
+      const key = state.lastRawKey || localStorage.getItem("gateway.lastRawKey") || "";
+      $("chatKey").value = key;
+      setStatus("chatStatus", key ? "Loaded last key" : "No raw key stored", key ? "ok" : "err");
+    }
+
+    function escapeHTML(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    $("createTenant").addEventListener("click", createTenant);
+    $("refreshTenants").addEventListener("click", refreshTenants);
+    $("tenantSelect").addEventListener("change", async () => {
+      await refreshKeys();
+      await refreshUsage();
+    });
+    $("createKey").addEventListener("click", createKey);
+    $("refreshKeys").addEventListener("click", refreshKeys);
+    $("sendChat").addEventListener("click", sendChat);
+    $("useLastKey").addEventListener("click", useLastKey);
+    $("refreshUsage").addEventListener("click", refreshUsage);
+
+    refreshHealth();
+    refreshTenants();
+    useLastKey();
+  </script>
+</body>
+</html>

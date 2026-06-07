@@ -1,0 +1,19 @@
+services:
+  ai-gateway:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DB_PATH: /data/gateway.db
+      PORT: 8080
+      RELAY_TIMEOUT_SECONDS: 3
+    volumes:
+      - gateway-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  gateway-data:

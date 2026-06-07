@@ -1,0 +1,513 @@
+openapi: 3.0.3
+info:
+  title: AI Gateway MVP
+  version: 0.1.0
+  description: Minimal OpenAI-compatible AI gateway with tenant API keys, scopes, mock proxy, and usage tracking.
+servers:
+  - url: http://localhost:8080
+paths:
+  /:
+    get:
+      summary: Dashboard
+      responses:
+        "200":
+          description: HTML dashboard
+          content:
+            text/html:
+              schema:
+                type: string
+  /dashboard:
+    get:
+      summary: Dashboard
+      responses:
+        "200":
+          description: HTML dashboard
+          content:
+            text/html:
+              schema:
+                type: string
+  /openapi.yaml:
+    get:
+      summary: OpenAPI specification
+      responses:
+        "200":
+          description: OpenAPI YAML
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /docs:
+    get:
+      summary: Swagger UI
+      responses:
+        "200":
+          description: Swagger UI HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+  /tenants:
+    post:
+      summary: Create tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenantRequest"
+      responses:
+        "201":
+          description: Tenant created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "400":
+          $ref: "#/components/responses/Error"
+    get:
+      summary: List tenants
+      responses:
+        "200":
+          description: Tenants
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tenant"
+  /tenants/{tenant_id}/keys:
+    post:
+      summary: Create API key for tenant
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAPIKeyRequest"
+      responses:
+        "201":
+          description: API key created. The raw key is returned only once.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/APIKey"
+                  - type: object
+                    required: [key]
+                    properties:
+                      key:
+                        type: string
+                        example: sk-gw_abc123
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    get:
+      summary: List tenant API keys
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+      responses:
+        "200":
+          description: API keys without raw secrets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/APIKey"
+        "404":
+          $ref: "#/components/responses/Error"
+  /tenants/{tenant_id}/keys/{key_id}:
+    patch:
+      summary: Update API key metadata, scopes, enabled state, or expiry
+      parameters:
+        - $ref: "#/components/parameters/TenantID"
+        - name: key_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAPIKeyRequest"
+      responses:
+        "200":
+          description: API key updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKey"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/chat/completions:
+    post:
+      summary: OpenAI-compatible chat completions proxy
+      security:
+        - GatewayBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+      responses:
+        "200":
+          description: Chat completion response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionResponse"
+        "400":
+          $ref: "#/components/responses/OpenAIError"
+        "401":
+          description: Invalid, disabled, expired, or missing Gateway key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenAIError"
+        "403":
+          description: Tenant or key scope does not allow this operation or model
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenAIError"
+        "502":
+          description: Downstream provider error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenAIError"
+        "504":
+          description: Downstream provider timeout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenAIError"
+  /usage:
+    get:
+      summary: Query usage records
+      parameters:
+        - $ref: "#/components/parameters/TenantIDQuery"
+        - $ref: "#/components/parameters/APIKeyIDQuery"
+        - $ref: "#/components/parameters/ModelQuery"
+        - $ref: "#/components/parameters/ThreadIDQuery"
+        - $ref: "#/components/parameters/FromQuery"
+        - $ref: "#/components/parameters/ToQuery"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+      responses:
+        "200":
+          description: Usage records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UsageRecord"
+  /usage/summary:
+    get:
+      summary: Summarize usage grouped by tenant, key, and model
+      parameters:
+        - $ref: "#/components/parameters/TenantIDQuery"
+        - $ref: "#/components/parameters/APIKeyIDQuery"
+        - $ref: "#/components/parameters/ModelQuery"
+        - $ref: "#/components/parameters/ThreadIDQuery"
+        - $ref: "#/components/parameters/FromQuery"
+        - $ref: "#/components/parameters/ToQuery"
+      responses:
+        "200":
+          description: Usage summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UsageSummary"
+components:
+  securitySchemes:
+    GatewayBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Gateway API key
+  parameters:
+    TenantID:
+      name: tenant_id
+      in: path
+      required: true
+      schema:
+        type: string
+    TenantIDQuery:
+      name: tenant_id
+      in: query
+      schema:
+        type: string
+    APIKeyIDQuery:
+      name: api_key_id
+      in: query
+      schema:
+        type: string
+    ModelQuery:
+      name: model
+      in: query
+      schema:
+        type: string
+    ThreadIDQuery:
+      name: thread_id
+      in: query
+      schema:
+        type: string
+    FromQuery:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date-time
+    ToQuery:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date-time
+  responses:
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    OpenAIError:
+      description: OpenAI-style error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OpenAIError"
+  schemas:
+    CreateTenantRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Acme
+        scopes:
+          type: array
+          items:
+            type: string
+          example: ["chat:invoke", "model:mock-gpt", "model:mock-error", "model:mock-timeout"]
+    Tenant:
+      type: object
+      required: [id, name, scopes, created_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+    CreateAPIKeyRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+          example: ["chat:invoke", "model:mock-gpt"]
+        enabled:
+          type: boolean
+          default: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+    UpdateAPIKeyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+    APIKey:
+      type: object
+      required: [id, tenant_id, name, key_prefix, scopes, enabled, created_at]
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        name:
+          type: string
+        key_prefix:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    ChatCompletionRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model:
+          type: string
+          example: mock-gpt
+        thread_id:
+          type: string
+          description: Optional caller-owned conversation id for usage attribution.
+        stream:
+          type: boolean
+          default: false
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+    ChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+        content:
+          type: string
+    ChatCompletionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+        created:
+          type: integer
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              message:
+                $ref: "#/components/schemas/ChatMessage"
+              finish_reason:
+                type: string
+        usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            completion_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+    UsageRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        tenant_id:
+          type: string
+        api_key_id:
+          type: string
+        api_key_name:
+          type: string
+        model:
+          type: string
+        thread_id:
+          type: string
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+    UsageSummary:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+        api_key_id:
+          type: string
+        model:
+          type: string
+        request_count:
+          type: integer
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        total_tokens:
+          type: integer
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+    OpenAIError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            type:
+              type: string
+            code:
+              type: string
