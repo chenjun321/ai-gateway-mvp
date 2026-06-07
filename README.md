@@ -40,6 +40,13 @@ model:*
 
 `/v1/chat/completions` is stateless, matching the common OpenAI-compatible proxy model. The caller owns conversation history and sends the full `messages` array each time. `thread_id` is optional and is recorded only for usage attribution.
 
+## Assumptions
+
+- This MVP optimizes for local review and a four-hour implementation window, so management APIs are open and the model provider is mocked.
+- Gateway API keys are different from upstream provider keys. Callers only receive Gateway keys, and upstream provider credentials can be added later behind the provider interface.
+- Scope strings are intentionally simple: `chat:invoke` controls the chat operation, `model:<name>` controls model access, `model:*` allows all models, and `*` allows everything.
+- The gateway does not own conversation state. The caller sends the full OpenAI-style `messages` array on each request.
+
 ## Run
 
 ```bash
@@ -68,6 +75,18 @@ http://localhost:8080/dashboard
 
 The dashboard can create tenants, issue keys, enable or disable keys, send a mock chat request, and inspect usage records.
 
+## Persistence
+
+The service uses SQLite through `github.com/mattn/go-sqlite3`. By default it writes to `gateway.db` when run locally, and Docker sets `DB_PATH=/data/gateway.db` with a named volume for persistence.
+
+Tables are created automatically on startup:
+
+```text
+tenants        tenant id, name, scopes, created_at
+api_keys       key id, tenant id, name, key hash, key prefix, scopes, enabled, expires_at, created_at
+usage_records  tenant id, key id, model, thread_id, prompt tokens, completion tokens, total tokens, created_at
+```
+
 ## Requirement Mapping
 
 ```text
@@ -77,6 +96,7 @@ Usage tracking            GET /usage, GET /usage/summary
 OpenAPI                   GET /openapi.yaml, GET /docs
 Dashboard                 GET /, GET /dashboard
 One-command runtime       docker compose up --build
+Error handling            401 invalid/disabled/expired key, 403 scope denied, 502/504 mock upstream failures
 ```
 
 ## Curl Flow
@@ -161,6 +181,16 @@ curl -i http://localhost:8080/v1/chat/completions \
 ```
 
 To test upstream `502` and `504`, create a key with `model:mock-error` or `model:mock-timeout` scope, then call those models.
+
+## Self-check
+
+```bash
+go test ./...
+docker compose up --build
+curl -fsS http://localhost:8080/healthz
+```
+
+Then run the curl flow above to verify tenant creation, key creation, OpenAI-style chat proxying, forbidden model access, disabled key rejection, and usage queries.
 
 ## Main Endpoints
 
