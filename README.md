@@ -89,13 +89,30 @@ usage_records  tenant id, key id, model, thread_id, prompt tokens, completion to
 
 ## Gateway Configuration
 
-Scope names, the model scope prefix, and mock models are configured in `gateway-config.json`, not hard-coded in the request handler. The service reads `CONFIG_PATH` on startup, defaulting to `gateway-config.json` locally and `/app/gateway-config.json` in Docker.
+Scope names, chat roles, mock response behavior, usage estimation, and mock models are configured in `gateway-config.json`, not hard-coded in the request handler. The service reads `CONFIG_PATH` on startup, defaulting to `gateway-config.json` locally and `/app/gateway-config.json` in Docker.
 
 ```json
 {
   "scopes": {
     "chat_invoke": "chat:invoke",
     "model_prefix": "model:"
+  },
+  "chat": {
+    "allowed_roles": ["system", "user", "assistant", "tool"],
+    "user_role": "user",
+    "assistant_role": "assistant"
+  },
+  "mock": {
+    "response_id": "chatcmpl-mock",
+    "response_object": "chat.completion",
+    "response_prefix": "Mock response: ",
+    "fallback_user_content": "hello",
+    "finish_reason": "stop"
+  },
+  "usage_estimation": {
+    "chars_per_token": 4,
+    "message_overhead_tokens": 4,
+    "prompt_overhead_tokens": 2
   },
   "models": [
     {"name": "mock-gpt", "behavior": "success"},
@@ -105,7 +122,7 @@ Scope names, the model scope prefix, and mock models are configured in `gateway-
 }
 ```
 
-Supported mock behaviors are `success`, `error`, and `timeout`. If a tenant is created without explicit scopes, it receives the configured chat scope plus the first configured model. A request must pass both scope checks and model configuration checks; even a key with `model:*` cannot call a model that is not listed in `gateway-config.json`.
+Supported mock behaviors are `success`, `error`, and `timeout`. If a tenant is created without explicit scopes, it receives the configured chat scope plus the first configured model. A request must pass scope checks, model configuration checks, and configured role validation; even a key with `model:*` cannot call a model that is not listed in `gateway-config.json`.
 
 ## Requirement Mapping
 
@@ -234,9 +251,9 @@ GET   /docs
 
 - Raw Gateway keys are never stored. The DB stores SHA-256 hashes plus a public prefix for display.
 - Tenant scopes are the upper bound. Key scopes must be a subset, and both are checked at request time in case tenant permissions change later.
-- Token counting is approximate for the mock provider: max of word count and `rune_count / 4`, plus a small per-message overhead.
+- Token counting is approximate for the mock provider and is controlled by `usage_estimation` in `gateway-config.json`.
 - Usage is recorded as immutable request records, not pre-aggregated counters. Tenant/key/model totals are computed with queries.
-- Scope names, model scope prefix, model names, and mock behavior live in `gateway-config.json`, keeping policy configuration outside the Go request path.
+- Scope names, role names, model scope prefix, model names, mock behavior, and usage-estimation knobs live in `gateway-config.json`, keeping policy configuration outside the Go request path.
 - The mock provider keeps the assignment runnable without real OpenAI/Claude/DeepSeek credentials. A real provider can be added behind `proxy.Provider`.
 - SQLite is used for a simple one-command MVP. For high concurrency, switch to Postgres/MySQL and add Redis-backed key/quota caching, similar to One API's production-oriented approach.
 - The dashboard is served as embedded static HTML from the Go binary, avoiding a separate Node build or extra container.

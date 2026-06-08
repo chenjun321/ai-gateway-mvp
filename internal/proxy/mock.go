@@ -63,15 +63,21 @@ type Provider interface {
 type MockProvider struct {
 	models     map[string]ModelConfig
 	modelNames []string
+	chat       config.ChatConfig
+	mock       config.MockConfig
+	usage      config.UsageEstimationConfig
 }
 
-func NewMockProvider(models []ModelConfig) (*MockProvider, error) {
-	if len(models) == 0 {
+func NewMockProvider(cfg *config.Config) (*MockProvider, error) {
+	if cfg == nil {
+		return nil, errors.New("mock provider requires config")
+	}
+	if len(cfg.Models) == 0 {
 		return nil, errors.New("mock provider requires at least one model")
 	}
-	byName := make(map[string]ModelConfig, len(models))
-	modelNames := make([]string, 0, len(models))
-	for _, model := range models {
+	byName := make(map[string]ModelConfig, len(cfg.Models))
+	modelNames := make([]string, 0, len(cfg.Models))
+	for _, model := range cfg.Models {
 		model.Name = strings.TrimSpace(model.Name)
 		model.Behavior = strings.TrimSpace(model.Behavior)
 		if model.Name == "" {
@@ -91,7 +97,13 @@ func NewMockProvider(models []ModelConfig) (*MockProvider, error) {
 		byName[model.Name] = model
 		modelNames = append(modelNames, model.Name)
 	}
-	return &MockProvider{models: byName, modelNames: modelNames}, nil
+	return &MockProvider{
+		models:     byName,
+		modelNames: modelNames,
+		chat:       cfg.Chat,
+		mock:       cfg.Mock,
+		usage:      cfg.UsageEstimation,
+	}, nil
 }
 
 func (p *MockProvider) Models() []string {
@@ -121,29 +133,29 @@ func (p *MockProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse
 		}
 	}
 
-	lastUser := "hello"
+	lastUser := p.mock.FallbackUserContent
 	for i := len(req.Messages) - 1; i >= 0; i-- {
-		if req.Messages[i].Role == "user" && strings.TrimSpace(req.Messages[i].Content) != "" {
+		if req.Messages[i].Role == p.chat.UserRole && strings.TrimSpace(req.Messages[i].Content) != "" {
 			lastUser = req.Messages[i].Content
 			break
 		}
 	}
-	content := "Mock response: " + lastUser
-	promptTokens := CountMessages(req.Messages)
-	completionTokens := CountText(content)
+	content := p.mock.ResponsePrefix + lastUser
+	promptTokens := CountMessages(req.Messages, p.usage)
+	completionTokens := CountText(content, p.usage.CharsPerToken)
 	return &ChatResponse{
-		ID:      "chatcmpl-mock",
-		Object:  "chat.completion",
+		ID:      p.mock.ResponseID,
+		Object:  p.mock.ResponseObject,
 		Created: time.Now().Unix(),
 		Model:   req.Model,
 		Choices: []ChatChoice{
 			{
 				Index: 0,
 				Message: ChatMessage{
-					Role:    "assistant",
+					Role:    p.chat.AssistantRole,
 					Content: content,
 				},
-				FinishReason: "stop",
+				FinishReason: p.mock.FinishReason,
 			},
 		},
 		Usage: Usage{
@@ -154,25 +166,28 @@ func (p *MockProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse
 	}, nil
 }
 
-func CountMessages(messages []ChatMessage) int {
+func CountMessages(messages []ChatMessage, usage config.UsageEstimationConfig) int {
 	total := 0
 	for _, msg := range messages {
-		total += CountText(msg.Role) + CountText(msg.Content) + 4
+		total += CountText(msg.Role, usage.CharsPerToken) + CountText(msg.Content, usage.CharsPerToken) + usage.MessageOverheadTokens
 	}
 	if total == 0 {
 		return 0
 	}
-	return total + 2
+	return total + usage.PromptOverheadTokens
 }
 
-func CountText(text string) int {
+func CountText(text string, charsPerToken int) int {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
 		return 0
 	}
+	if charsPerToken <= 0 {
+		charsPerToken = 1
+	}
 	words := len(strings.Fields(trimmed))
 	chars := len([]rune(trimmed))
-	byChars := (chars + 3) / 4
+	byChars := (chars + charsPerToken - 1) / charsPerToken
 	if words > byChars {
 		return words
 	}

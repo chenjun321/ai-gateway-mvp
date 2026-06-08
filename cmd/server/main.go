@@ -28,7 +28,7 @@ func main() {
 	}
 	defer st.Close()
 
-	provider, err := proxy.NewMockProvider(cfg.Models)
+	provider, err := proxy.NewMockProvider(cfg)
 	if err != nil {
 		log.Fatalf("create mock provider: %v", err)
 	}

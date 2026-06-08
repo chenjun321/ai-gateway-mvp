@@ -336,6 +336,50 @@ components:
             model_wildcard:
               type: string
               example: "model:*"
+        chat:
+          type: object
+          properties:
+            allowed_roles:
+              type: array
+              items:
+                type: string
+              example: [system, user, assistant, tool]
+            user_role:
+              type: string
+              example: user
+            assistant_role:
+              type: string
+              example: assistant
+        mock:
+          type: object
+          properties:
+            response_id:
+              type: string
+              example: chatcmpl-mock
+            response_object:
+              type: string
+              example: chat.completion
+            response_prefix:
+              type: string
+              example: "Mock response: "
+            fallback_user_content:
+              type: string
+              example: hello
+            finish_reason:
+              type: string
+              example: stop
+        usage_estimation:
+          type: object
+          properties:
+            chars_per_token:
+              type: integer
+              example: 4
+            message_overhead_tokens:
+              type: integer
+              example: 4
+            prompt_overhead_tokens:
+              type: integer
+              example: 2
         models:
           type: array
           items:

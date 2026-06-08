@@ -13,6 +13,23 @@ func TestLoadConfig(t *testing.T) {
 			"chat_invoke": "chat:invoke",
 			"model_prefix": "model:"
 		},
+		"chat": {
+			"allowed_roles": ["system", "user", "assistant", "tool"],
+			"user_role": "user",
+			"assistant_role": "assistant"
+		},
+		"mock": {
+			"response_id": "chatcmpl-mock",
+			"response_object": "chat.completion",
+			"response_prefix": "Mock response: ",
+			"fallback_user_content": "hello",
+			"finish_reason": "stop"
+		},
+		"usage_estimation": {
+			"chars_per_token": 4,
+			"message_overhead_tokens": 4,
+			"prompt_overhead_tokens": 2
+		},
 		"models": [
 			{"name": "mock-gpt", "behavior": "success"},
 			{"name": "mock-timeout", "behavior": "timeout"}
@@ -33,5 +50,8 @@ func TestLoadConfig(t *testing.T) {
 	}
 	if got := cfg.DefaultTenantScopes(); len(got) != 2 || got[1] != "model:mock-gpt" {
 		t.Fatalf("unexpected default scopes: %#v", got)
+	}
+	if !cfg.AllowsRole("tool") {
+		t.Fatal("expected tool role to be allowed")
 	}
 }

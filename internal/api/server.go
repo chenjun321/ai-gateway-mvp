@@ -269,6 +269,13 @@ func (s *Server) chatCompletions(c *gin.Context) {
 		writeOpenAIError(c, http.StatusBadRequest, "invalid_request", "messages is required")
 		return
 	}
+	for i := range req.Messages {
+		req.Messages[i].Role = strings.TrimSpace(req.Messages[i].Role)
+		if !s.config.AllowsRole(req.Messages[i].Role) {
+			writeOpenAIError(c, http.StatusBadRequest, "invalid_request", "message role is not configured: "+req.Messages[i].Role)
+			return
+		}
+	}
 	if req.Stream {
 		writeOpenAIError(c, http.StatusBadRequest, "unsupported_feature", "streaming is not implemented in this MVP")
 		return
@@ -419,6 +426,23 @@ func (s *Server) publicConfig(c *gin.Context) {
 			"chat_invoke":    s.config.Scopes.ChatInvoke,
 			"model_prefix":   s.config.Scopes.ModelPrefix,
 			"model_wildcard": s.config.ModelWildcardScope(),
+		},
+		"chat": gin.H{
+			"allowed_roles":  s.config.Chat.AllowedRoles,
+			"user_role":      s.config.Chat.UserRole,
+			"assistant_role": s.config.Chat.AssistantRole,
+		},
+		"mock": gin.H{
+			"response_id":           s.config.Mock.ResponseID,
+			"response_object":       s.config.Mock.ResponseObject,
+			"response_prefix":       s.config.Mock.ResponsePrefix,
+			"fallback_user_content": s.config.Mock.FallbackUserContent,
+			"finish_reason":         s.config.Mock.FinishReason,
+		},
+		"usage_estimation": gin.H{
+			"chars_per_token":         s.config.UsageEstimation.CharsPerToken,
+			"message_overhead_tokens": s.config.UsageEstimation.MessageOverheadTokens,
+			"prompt_overhead_tokens":  s.config.UsageEstimation.PromptOverheadTokens,
 		},
 		"models":                s.config.ModelNames(),
 		"default_tenant_scopes": s.config.DefaultTenantScopes(),

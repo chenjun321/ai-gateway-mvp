@@ -462,7 +462,7 @@
             <input id="threadId" data-testid="thread-id" value="thread-dashboard-1">
           </label>
           <label>User message
-            <textarea id="chatMessage" data-testid="chat-message">hello gateway</textarea>
+            <textarea id="chatMessage" data-testid="chat-message"></textarea>
           </label>
           <div class="row">
             <button id="sendChat" class="primary" data-testid="send-chat">Send Chat</button>
@@ -539,11 +539,13 @@
       const chatScope = state.config?.scopes?.chat_invoke || "";
       const tenantScopes = state.config?.default_tenant_scopes || [];
       const firstModel = models[0] || "";
+      const fallbackMessage = state.config?.mock?.fallback_user_content || "";
       $("tenantScopes").value = tenantScopes.length
         ? tenantScopes.join(", ")
         : [chatScope, ...models.map(modelScope)].filter(Boolean).join(", ");
       $("keyScopes").value = firstModel ? [chatScope, modelScope(firstModel)].filter(Boolean).join(", ") : chatScope;
       $("chatModel").value = firstModel;
+      $("chatMessage").value = fallbackMessage;
     }
 
     async function api(path, options = {}) {
@@ -763,13 +765,17 @@
       }
       setStatus("chatStatus", "Sending request...");
       try {
+        const userRole = state.config?.chat?.user_role;
+        if (!userRole) {
+          throw new Error("Chat role configuration is not loaded");
+        }
         const body = await api("/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${gatewayKey}` },
           body: JSON.stringify({
             model: $("chatModel").value.trim(),
             thread_id: $("threadId").value.trim(),
-            messages: [{ role: "user", content: $("chatMessage").value }]
+            messages: [{ role: userRole, content: $("chatMessage").value }]
           })
         });
         $("chatResponse").textContent = JSON.stringify(body, null, 2);
