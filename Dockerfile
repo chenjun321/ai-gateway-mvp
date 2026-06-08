@@ -1,10 +1,9 @@
 FROM golang:1.25-alpine AS build
 WORKDIR /src
-RUN apk add --no-cache build-base
 COPY go.mod go.sum ./
-RUN go mod download
+RUN GOPROXY=https://goproxy.cn,direct go mod download
 COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -o /out/ai-gateway ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/ai-gateway ./cmd/server
 
 FROM alpine:3.20
 WORKDIR /app
