@@ -50,7 +50,7 @@ func Allows(scopes []string, required string) bool {
 		if scope == required || scope == "*" {
 			return true
 		}
-		if strings.HasSuffix(scope, ":*") {
+		if scope != "*" && strings.HasSuffix(scope, "*") {
 			prefix := strings.TrimSuffix(scope, "*")
 			if strings.HasPrefix(required, prefix) {
 				return true

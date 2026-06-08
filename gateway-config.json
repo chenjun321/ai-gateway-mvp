@@ -1,0 +1,20 @@
+{
+  "scopes": {
+    "chat_invoke": "chat:invoke",
+    "model_prefix": "model:"
+  },
+  "models": [
+    {
+      "name": "mock-gpt",
+      "behavior": "success"
+    },
+    {
+      "name": "mock-error",
+      "behavior": "error"
+    },
+    {
+      "name": "mock-timeout",
+      "behavior": "timeout"
+    }
+  ]
+}

@@ -52,6 +52,16 @@ paths:
       responses:
         "200":
           description: OK
+  /config:
+    get:
+      summary: Public gateway configuration
+      responses:
+        "200":
+          description: Runtime configuration used by the dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicConfig"
   /tenants:
     post:
       summary: Create tenant
@@ -311,6 +321,31 @@ components:
           schema:
             $ref: "#/components/schemas/OpenAIError"
   schemas:
+    PublicConfig:
+      type: object
+      properties:
+        scopes:
+          type: object
+          properties:
+            chat_invoke:
+              type: string
+              example: chat:invoke
+            model_prefix:
+              type: string
+              example: "model:"
+            model_wildcard:
+              type: string
+              example: "model:*"
+        models:
+          type: array
+          items:
+            type: string
+          example: [mock-gpt, mock-error, mock-timeout]
+        default_tenant_scopes:
+          type: array
+          items:
+            type: string
+          example: ["chat:invoke", "model:mock-gpt"]
     CreateTenantRequest:
       type: object
       required: [name]

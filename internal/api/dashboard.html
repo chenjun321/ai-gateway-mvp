@@ -386,7 +386,7 @@
               <input id="tenantName" data-testid="tenant-name" value="acme">
             </label>
             <label>Scopes
-              <input id="tenantScopes" data-testid="tenant-scopes" value="chat:invoke, model:mock-gpt, model:mock-error, model:mock-timeout">
+              <input id="tenantScopes" data-testid="tenant-scopes">
             </label>
           </div>
           <div class="row">
@@ -412,7 +412,7 @@
             </label>
           </div>
           <label>Scopes
-            <input id="keyScopes" data-testid="key-scopes" value="chat:invoke, model:mock-gpt">
+            <input id="keyScopes" data-testid="key-scopes">
           </label>
           <label class="checkbox-row">
             <input id="keyEnabled" data-testid="key-enabled" type="checkbox" checked>
@@ -455,7 +455,7 @@
               <input id="chatKey" data-testid="chat-key" placeholder="sk-gw_...">
             </label>
             <label>Model
-              <input id="chatModel" data-testid="chat-model" value="mock-gpt">
+              <input id="chatModel" data-testid="chat-model">
             </label>
           </div>
           <label>Thread ID
@@ -511,6 +511,7 @@
     const state = {
       tenants: [],
       keys: [],
+      config: null,
       lastRawKey: localStorage.getItem("gateway.lastRawKey") || ""
     };
 
@@ -527,6 +528,22 @@
         .split(/[\n,]/)
         .map((scope) => scope.trim())
         .filter(Boolean);
+    }
+
+    function modelScope(model) {
+      return `${state.config?.scopes?.model_prefix || ""}${model}`;
+    }
+
+    function applyConfigDefaults() {
+      const models = state.config?.models || [];
+      const chatScope = state.config?.scopes?.chat_invoke || "";
+      const tenantScopes = state.config?.default_tenant_scopes || [];
+      const firstModel = models[0] || "";
+      $("tenantScopes").value = tenantScopes.length
+        ? tenantScopes.join(", ")
+        : [chatScope, ...models.map(modelScope)].filter(Boolean).join(", ");
+      $("keyScopes").value = firstModel ? [chatScope, modelScope(firstModel)].filter(Boolean).join(", ") : chatScope;
+      $("chatModel").value = firstModel;
     }
 
     async function api(path, options = {}) {
@@ -629,6 +646,15 @@
       } catch {
         $("health").textContent = "down";
         $("health").className = "pill disabled";
+      }
+    }
+
+    async function refreshConfig() {
+      try {
+        state.config = await api("/config");
+        applyConfigDefaults();
+      } catch (err) {
+        setStatus("tenantStatus", err.message, "err");
       }
     }
 
@@ -807,9 +833,12 @@
     $("useLastKey").addEventListener("click", useLastKey);
     $("refreshUsage").addEventListener("click", refreshUsage);
 
-    refreshHealth();
-    refreshTenants();
-    useLastKey();
+    (async function init() {
+      await refreshConfig();
+      await refreshHealth();
+      await refreshTenants();
+      useLastKey();
+    })();
   </script>
 </body>
 </html>

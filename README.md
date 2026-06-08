@@ -44,7 +44,7 @@ model:*
 
 - This MVP optimizes for local review and a four-hour implementation window, so management APIs are open and the model provider is mocked.
 - Gateway API keys are different from upstream provider keys. Callers only receive Gateway keys, and upstream provider credentials can be added later behind the provider interface.
-- Scope strings are intentionally simple: `chat:invoke` controls the chat operation, `model:<name>` controls model access, `model:*` allows all models, and `*` allows everything.
+- Scope strings are intentionally simple: `chat:invoke` controls the chat operation, `model:<name>` controls model access, `model:*` allows all configured models, and `*` allows everything.
 - The gateway does not own conversation state. The caller sends the full OpenAI-style `messages` array on each request.
 
 ## Run
@@ -77,7 +77,7 @@ The dashboard can create tenants, issue keys, enable or disable keys, send a moc
 
 ## Persistence
 
-The service uses SQLite through `github.com/mattn/go-sqlite3`. By default it writes to `gateway.db` when run locally, and Docker sets `DB_PATH=/data/gateway.db` with a named volume for persistence.
+The service uses SQLite through the pure Go `modernc.org/sqlite` driver. By default it writes to `gateway.db` when run locally, and Docker sets `DB_PATH=/data/gateway.db` with a named volume for persistence.
 
 Tables are created automatically on startup:
 
@@ -86,6 +86,26 @@ tenants        tenant id, name, scopes, created_at
 api_keys       key id, tenant id, name, key hash, key prefix, scopes, enabled, expires_at, created_at
 usage_records  tenant id, key id, model, thread_id, prompt tokens, completion tokens, total tokens, created_at
 ```
+
+## Gateway Configuration
+
+Scope names, the model scope prefix, and mock models are configured in `gateway-config.json`, not hard-coded in the request handler. The service reads `CONFIG_PATH` on startup, defaulting to `gateway-config.json` locally and `/app/gateway-config.json` in Docker.
+
+```json
+{
+  "scopes": {
+    "chat_invoke": "chat:invoke",
+    "model_prefix": "model:"
+  },
+  "models": [
+    {"name": "mock-gpt", "behavior": "success"},
+    {"name": "mock-error", "behavior": "error"},
+    {"name": "mock-timeout", "behavior": "timeout"}
+  ]
+}
+```
+
+Supported mock behaviors are `success`, `error`, and `timeout`. If a tenant is created without explicit scopes, it receives the configured chat scope plus the first configured model. A request must pass both scope checks and model configuration checks; even a key with `model:*` cannot call a model that is not listed in `gateway-config.json`.
 
 ## Requirement Mapping
 
@@ -205,6 +225,7 @@ GET   /usage
 GET   /usage/summary
 GET   /
 GET   /dashboard
+GET   /config
 GET   /openapi.yaml
 GET   /docs
 ```
@@ -215,6 +236,7 @@ GET   /docs
 - Tenant scopes are the upper bound. Key scopes must be a subset, and both are checked at request time in case tenant permissions change later.
 - Token counting is approximate for the mock provider: max of word count and `rune_count / 4`, plus a small per-message overhead.
 - Usage is recorded as immutable request records, not pre-aggregated counters. Tenant/key/model totals are computed with queries.
+- Scope names, model scope prefix, model names, and mock behavior live in `gateway-config.json`, keeping policy configuration outside the Go request path.
 - The mock provider keeps the assignment runnable without real OpenAI/Claude/DeepSeek credentials. A real provider can be added behind `proxy.Provider`.
 - SQLite is used for a simple one-command MVP. For high concurrency, switch to Postgres/MySQL and add Redis-backed key/quota caching, similar to One API's production-oriented approach.
 - The dashboard is served as embedded static HTML from the Go binary, avoiding a separate Node build or extra container.
@@ -225,4 +247,5 @@ GET   /docs
 - Streaming responses are rejected with `400`; non-streaming chat completions are implemented.
 - There is no quota enforcement yet, only usage recording.
 - No service-owned thread/message store. Callers own chat history and may pass `thread_id` for attribution.
+- Model configuration is loaded at startup; there is no hot reload or admin UI for model changes yet.
 - No real upstream model provider is wired in this MVP.

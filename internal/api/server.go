@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"ai-gateway-mvp/internal/auth"
+	"ai-gateway-mvp/internal/config"
 	"ai-gateway-mvp/internal/proxy"
 	"ai-gateway-mvp/internal/store"
 )
@@ -19,11 +20,12 @@ import (
 type Server struct {
 	store        *store.Store
 	provider     proxy.Provider
+	config       *config.Config
 	relayTimeout time.Duration
 }
 
-func NewServer(st *store.Store, provider proxy.Provider, relayTimeout time.Duration) *Server {
-	return &Server{store: st, provider: provider, relayTimeout: relayTimeout}
+func NewServer(st *store.Store, provider proxy.Provider, cfg *config.Config, relayTimeout time.Duration) *Server {
+	return &Server{store: st, provider: provider, config: cfg, relayTimeout: relayTimeout}
 }
 
 func (s *Server) Router() *gin.Engine {
@@ -34,6 +36,7 @@ func (s *Server) Router() *gin.Engine {
 	})
 	r.GET("/", s.dashboard)
 	r.GET("/dashboard", s.dashboard)
+	r.GET("/config", s.publicConfig)
 	r.GET("/openapi.yaml", s.openapi)
 	r.GET("/docs", s.docs)
 
@@ -66,7 +69,7 @@ func (s *Server) createTenant(c *gin.Context) {
 		return
 	}
 	if len(req.Scopes) == 0 {
-		req.Scopes = []string{"chat:invoke", "model:mock-gpt"}
+		req.Scopes = s.config.DefaultTenantScopes()
 	}
 	id, err := auth.NewID("tenant")
 	if err != nil {
@@ -275,13 +278,17 @@ func (s *Server) chatCompletions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if !auth.Allows(tenant.Scopes, "chat:invoke") || !auth.Allows(apiKey.Scopes, "chat:invoke") {
+	if !auth.Allows(tenant.Scopes, s.config.Scopes.ChatInvoke) || !auth.Allows(apiKey.Scopes, s.config.Scopes.ChatInvoke) {
 		writeOpenAIError(c, http.StatusForbidden, "forbidden", "key is not allowed to invoke chat completions")
 		return
 	}
-	modelScope := "model:" + req.Model
+	modelScope := s.config.ModelScope(req.Model)
 	if !auth.Allows(tenant.Scopes, modelScope) || !auth.Allows(apiKey.Scopes, modelScope) {
 		writeOpenAIError(c, http.StatusForbidden, "forbidden", "key is not allowed to use model "+req.Model)
+		return
+	}
+	if !s.provider.Supports(req.Model) {
+		writeOpenAIError(c, http.StatusBadRequest, "invalid_request", "model is not configured: "+req.Model)
 		return
 	}
 
@@ -404,6 +411,18 @@ func usageFilterFromQuery(c *gin.Context) (store.UsageFilter, bool) {
 		filter.To = &t
 	}
 	return filter, true
+}
+
+func (s *Server) publicConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"scopes": gin.H{
+			"chat_invoke":    s.config.Scopes.ChatInvoke,
+			"model_prefix":   s.config.Scopes.ModelPrefix,
+			"model_wildcard": s.config.ModelWildcardScope(),
+		},
+		"models":                s.config.ModelNames(),
+		"default_tenant_scopes": s.config.DefaultTenantScopes(),
+	})
 }
 
 func (s *Server) openapi(c *gin.Context) {

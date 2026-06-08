@@ -3,11 +3,23 @@ package proxy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
+
+	"ai-gateway-mvp/internal/config"
 )
 
 var ErrDownstream = errors.New("downstream provider error")
+var ErrUnsupportedModel = errors.New("unsupported model")
+
+const (
+	ModelBehaviorSuccess = "success"
+	ModelBehaviorError   = "error"
+	ModelBehaviorTimeout = "timeout"
+)
+
+type ModelConfig = config.ModelConfig
 
 type ChatMessage struct {
 	Role    string `json:"role"`
@@ -43,20 +55,65 @@ type Usage struct {
 }
 
 type Provider interface {
+	Models() []string
+	Supports(model string) bool
 	Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error)
 }
 
-type MockProvider struct{}
+type MockProvider struct {
+	models     map[string]ModelConfig
+	modelNames []string
+}
 
-func NewMockProvider() *MockProvider {
-	return &MockProvider{}
+func NewMockProvider(models []ModelConfig) (*MockProvider, error) {
+	if len(models) == 0 {
+		return nil, errors.New("mock provider requires at least one model")
+	}
+	byName := make(map[string]ModelConfig, len(models))
+	modelNames := make([]string, 0, len(models))
+	for _, model := range models {
+		model.Name = strings.TrimSpace(model.Name)
+		model.Behavior = strings.TrimSpace(model.Behavior)
+		if model.Name == "" {
+			return nil, errors.New("model name is required")
+		}
+		if model.Behavior == "" {
+			model.Behavior = ModelBehaviorSuccess
+		}
+		switch model.Behavior {
+		case ModelBehaviorSuccess, ModelBehaviorError, ModelBehaviorTimeout:
+		default:
+			return nil, fmt.Errorf("model %q has unsupported behavior %q", model.Name, model.Behavior)
+		}
+		if _, exists := byName[model.Name]; exists {
+			return nil, fmt.Errorf("duplicate model %q", model.Name)
+		}
+		byName[model.Name] = model
+		modelNames = append(modelNames, model.Name)
+	}
+	return &MockProvider{models: byName, modelNames: modelNames}, nil
+}
+
+func (p *MockProvider) Models() []string {
+	models := make([]string, len(p.modelNames))
+	copy(models, p.modelNames)
+	return models
+}
+
+func (p *MockProvider) Supports(model string) bool {
+	_, ok := p.models[model]
+	return ok
 }
 
 func (p *MockProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
-	switch req.Model {
-	case "mock-error":
+	model, ok := p.models[req.Model]
+	if !ok {
+		return nil, ErrUnsupportedModel
+	}
+	switch model.Behavior {
+	case ModelBehaviorError:
 		return nil, ErrDownstream
-	case "mock-timeout":
+	case ModelBehaviorTimeout:
 		select {
 		case <-time.After(10 * time.Second):
 		case <-ctx.Done():
